@@ -1,60 +1,95 @@
 # Namastack Outbox Visualiser
 
-Web-UI für die Tabellen von [Namastack Outbox](https://github.com/namastack/namastack-outbox) (JDBC-Modul, getestet gegen das Schema von v1.11).
-Sie zeigt, was in den Outboxen eines oder mehrerer Services liegt, und erlaubt es, Events erneut zu verarbeiten.
+Web UI for the tables of [Namastack Outbox](https://github.com/namastack/namastack-outbox) (JDBC module, tested against the v1.11 schema).
+It shows what is sitting in the outboxes of one or more services and lets you reprocess events.
 
-- **Dashboard**: offene, fehlgeschlagene und abgeschlossene Records je Service, ältester offener Record, Durchsatz (erstellt vs. abgeschlossen) und Fehler je Handler, live alle 5 s
-- **Records**: filterbare Liste mit Detailansicht (Payload, Context, Fehler, Retry-Stand)
-- **Key-Timeline**: alle Records eines `record_key` auf einer Zeitachse, mit Markierung, welche Records auf einen Vorgänger warten
-- **Blockierte Keys**: FAILED-Records und die Anzahl der Records, die dahinter hängen
-- **Cluster**: Namastack-Instanzen mit Heartbeat und die Zuordnung der 256 Partitionen
-- **Audit-Log**: wer wann welche Aktion ausgeführt hat
+- **Dashboard**: open, failed and completed records per service, oldest open record, throughput (created vs. completed) and failures per handler, live every 5 s
+- **Records**: filterable list with a detail view (payload, context, failure, retry state)
+- **Key timeline**: all records of a `record_key` on a timeline, marking which records are waiting for a predecessor
+- **Blocked keys**: FAILED records and the number of records queued behind them
+- **Cluster**: Namastack instances with their heartbeat and the assignment of the 256 partitions
+- **Audit log**: who performed which action and when
 
-## Aktionen
+## Actions
 
-| Aktion | Gilt für | Was passiert in `outbox_record` |
+| Action | Applies to | What happens in `outbox_record` |
 |---|---|---|
-| Erneut versuchen | FAILED | `status=NEW, failure_count=0, failure_reason=NULL, next_retry_at=now` |
-| Jetzt ausführen | NEW im Backoff | `next_retry_at=now` |
-| Erneut senden (Replay) | COMPLETED | neue Zeile (UUIDv7) mit gleichem Key, Typ, Payload, Context, Handler und Partition, `status=NEW`, `created_at=now` |
-| Alle erneut versuchen | alle FAILED eines Handlers/Typs | wie "Erneut versuchen", als ein UPDATE |
+| Retry | FAILED | `status=NEW, failure_count=0, failure_reason=NULL, next_retry_at=now` |
+| Run now | NEW in backoff | `next_retry_at=now` |
+| Replay | COMPLETED | new row (UUIDv7) with the same key, type, payload, context, handler and partition, `status=NEW`, `created_at=now` |
+| Retry all | all FAILED records of a handler/type | like "Retry", as a single UPDATE |
 
-Jede Aktion ist ein einzelnes Statement mit Status-Bedingung (`WHERE id = ? AND status = 'FAILED'` usw.). Sie ist damit atomar, und ein doppelter Klick oder eine parallel laufende Namastack-Instanz richtet keinen Schaden an.
+Every action is a single statement with a status condition (`WHERE id = ? AND status = 'FAILED'` etc.). This makes it atomic, and a double click or a Namastack instance running in parallel does no harm.
 
-Wichtig zum Verständnis: Namastack verarbeitet einen Record erst, wenn alle früheren Records **desselben Keys** abgeschlossen sind. Ein FAILED-Record blockiert also seinen Key. Erst ein Retry gibt die wartenden Records frei.
+Important to understand: Namastack only processes a record once all earlier records **of the same key** are completed. A FAILED record therefore blocks its key. Only a retry releases the waiting records.
 
-Ein Replay funktioniert nur, solange der COMPLETED-Record noch existiert, also solange Namastack ihn nicht beim Aufräumen gelöscht hat.
+A replay only works as long as the COMPLETED record still exists, i.e. as long as Namastack has not deleted it during cleanup.
 
-## Schnellstart mit Demodaten
+## Quick start with demo data
 
-Voraussetzung: JDK 25 (Gradle lädt es über die Toolchain automatisch, falls es fehlt).
+Requirement: JDK 25 (Gradle downloads it via the toolchain if it is missing).
 
 ```bash
 ./gradlew bootRun --args='--spring.profiles.active=demo'
 ```
 
-Dann <http://localhost:8090> öffnen und mit `admin` / `admin` (Operator) oder `viewer` / `viewer` (nur lesen) anmelden.
-Das Demo-Profil legt zwei In-Memory-H2-Datenbanken mit dem originalen Namastack-Schema an und simuliert darin laufend Events, Retries, Fehler und Instanzen.
+Then open <http://localhost:8090> and log in with `admin` / `admin` (operator) or `viewer` / `viewer` (read-only).
+The demo profile creates two in-memory H2 databases with the original Namastack schema and continuously simulates events, retries, failures and instances in them.
 
-## Eigene Services anbinden
+## Docker
 
-Pro Service-Datenbank kommt ein Eintrag unter `visualiser.sources` in die `application.yml` (oder per Umgebungsvariablen):
+The image is published as [`asgreflexx/namastack-visualiser`](https://hub.docker.com/r/asgreflexx/namastack-visualiser) for `linux/amd64` and `linux/arm64`.
+
+Demo:
+
+```bash
+docker run --rm -p 8090:8090 -e SPRING_PROFILES_ACTIVE=demo asgreflexx/namastack-visualiser
+```
+
+With your own configuration, mount an `application.yml` (see below) into `/config`:
+
+```bash
+docker run -d -p 8090:8090 \
+  -v ./application.yml:/config/application.yml:ro \
+  -e ORDERS_DB_PASSWORD=... \
+  asgreflexx/namastack-visualiser
+```
+
+Or configure everything via environment variables:
+
+```bash
+docker run -d -p 8090:8090 \
+  -e VISUALISER_SOURCES_0_ID=order-modulith \
+  -e VISUALISER_SOURCES_0_URL=jdbc:mysql://db:3306/orders \
+  -e VISUALISER_SOURCES_0_USERNAME=outbox_visualiser \
+  -e VISUALISER_SOURCES_0_PASSWORD=... \
+  -e VISUALISER_USERS_0_USERNAME=ops \
+  -e 'VISUALISER_USERS_0_PASSWORD={bcrypt}$2a$10$...' \
+  -e VISUALISER_USERS_0_ROLE=OPERATOR \
+  asgreflexx/namastack-visualiser
+```
+
+The container runs as a non-root user and listens on port 8090. `/actuator/health` is reachable without login and can be used for liveness/readiness probes.
+
+## Connecting your own services
+
+Add one entry per service database under `visualiser.sources` in `application.yml` (or via environment variables):
 
 ```yaml
 visualiser:
   sources:
-    - id: order-modulith            # erscheint in URLs, nur a-z, 0-9 und -
+    - id: order-modulith            # appears in URLs, only a-z, 0-9 and -
       name: Order Modulith
       url: jdbc:mysql://db:3306/orders
       username: outbox_visualiser
       password: ${ORDERS_DB_PASSWORD}
-      schema:                       # wie namastack.outbox.jdbc.schema-name
-      table-prefix: ""              # wie namastack.outbox.jdbc.table-prefix
-      tables:                       # nur bei eigenen Tabellennamen nötig
+      schema:                       # like namastack.outbox.jdbc.schema-name
+      table-prefix: ""              # like namastack.outbox.jdbc.table-prefix
+      tables:                       # only needed for custom table names
         record: outbox_record
         instance: outbox_instance
         partition: outbox_partition
-      read-only: false              # true schaltet alle Aktionen für diese Quelle ab
+      read-only: false              # true disables all actions for this source
     - id: payment-service
       name: Payment Service
       url: jdbc:sqlserver://db:1433;databaseName=payments;encrypt=false
@@ -69,35 +104,45 @@ visualiser:
       role: VIEWER
 ```
 
-Unterstützte Datenbanken: MySQL, MariaDB, Oracle, SQL Server und H2. Treiber für alle fünf sind enthalten.
-Eine nicht erreichbare Datenbank verhindert den Start nicht, sie wird im Dashboard rot angezeigt.
-Ohne konfigurierte Benutzer wird beim Start ein Operator `admin` mit Zufallspasswort angelegt und ins Log geschrieben.
+Supported databases: MySQL, MariaDB, Oracle, SQL Server and H2. Drivers for all five are included.
+An unreachable database does not prevent startup; it is shown in red on the dashboard.
+If no users are configured, an operator `admin` with a random password is created at startup and written to the log.
 
-### Nötige Datenbankrechte
+### Required database privileges
 
-- `SELECT` auf `outbox_record`, `outbox_instance`, `outbox_partition`
-- zusätzlich `UPDATE` und `INSERT` auf `outbox_record`, wenn die Quelle nicht `read-only` ist
+- `SELECT` on `outbox_record`, `outbox_instance`, `outbox_partition`
+- additionally `UPDATE` and `INSERT` on `outbox_record` if the source is not `read-only`
 
-## Entwicklung
+## Development
 
 ```bash
-./gradlew test              # Unit- und Web-Tests gegen H2
-./gradlew integrationTest   # Testcontainers gegen MySQL, MariaDB, Oracle Free und SQL Server (braucht Docker)
+./gradlew test              # unit and web tests against H2
+./gradlew integrationTest   # Testcontainers against MySQL, MariaDB, Oracle Free and SQL Server (requires Docker)
 ./gradlew bootJar           # build/libs/namastack-visualiser-*.jar
+docker build -t namastack-visualiser .
 ```
 
-Die Integrationstests spielen jeweils das originale Namastack-Schema-Skript der Datenbank ein (`src/integrationTest/resources/schema`).
+The integration tests load the original Namastack schema script of each database (`src/integrationTest/resources/schema`).
 
-Aufbau:
+### Releasing
 
-| Paket | Inhalt |
+Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml`: it runs the tests, builds the image for amd64 and arm64 and pushes it to Docker Hub as `X.Y.Z`, `X.Y` and `latest`.
+The repository needs the Actions secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` (a Docker Hub access token with read & write scope).
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+### Structure
+
+| Package | Contents |
 |---|---|
-| `source` | Konfiguration, ein Connection-Pool pro Quelle, Dialekt-Erkennung (nur für Pagination), Tabellennamen |
-| `record` | Lesezugriffe auf `outbox_record` |
-| `cluster` | Instanzen und Partitionen |
-| `stats` | Kennzahlen und Durchsatz fürs Dashboard |
-| `action` | Retry, Run-now, Replay, Bulk-Retry und das Audit-Log |
-| `web` | Controller, Thymeleaf + htmx, Chart.js |
-| `demo` | Datengenerator für das Profil `demo` |
+| `source` | Configuration, one connection pool per source, dialect detection (only for pagination), table names |
+| `record` | Read access to `outbox_record` |
+| `cluster` | Instances and partitions |
+| `stats` | Metrics and throughput for the dashboard |
+| `action` | Retry, run now, replay, bulk retry and the audit log |
+| `web` | Controllers, Thymeleaf + htmx, Chart.js |
+| `demo` | Data generator for the `demo` profile |
 
-Zeitstempel werden wie bei Namastack selbst als `java.sql.Timestamp` gebunden und gelesen. Visualiser und Services sollten deshalb in derselben JVM-Zeitzone laufen, wenn die Datenbank Spalten ohne Zeitzone verwendet (MySQL/MariaDB `TIMESTAMP`, SQL Server `DATETIME2`).
+Like Namastack itself, timestamps are bound and read as `java.sql.Timestamp`. The visualiser and the services should therefore run in the same JVM time zone if the database uses columns without a time zone (MySQL/MariaDB `TIMESTAMP`, SQL Server `DATETIME2`).

@@ -19,22 +19,19 @@ management:
 visualiser:
   # How long an ACTIVE instance may be silent before it is shown as stale.
   instance-stale-after: 30s
-  # One entry per service database containing Namastack outbox tables.
-  sources:
-    - id: testid
-      name: testname
-      url: "" # jdbc:
-      username: testuser
-      password: ""
-      schema: ""          # like namastack.outbox.jdbc.schema-name
-      table-prefix: ""       # like namastack.outbox.jdbc.table-prefix
-      read-only: true       # true disables retry/replay for this source
+  # One entry per service database containing Namastack outbox tables, e.g.:
+  #   - id: order-modulith      # used in URLs, only a-z, 0-9 and -
+  #     name: Order Modulith
+  #     url: jdbc:mysql://db:3306/orders
+  #     username: outbox_visualiser
+  #     password: ${ORDERS_DB_PASSWORD}
+  #     schema: ""              # like namastack.outbox.jdbc.schema-name
+  #     table-prefix: ""        # like namastack.outbox.jdbc.table-prefix
+  #     read-only: true         # true disables retry/replay for this source
+  sources: []
   # Users that may log in. Passwords use Spring Security's {id} format, e.g. {bcrypt}$2a$10$...
-  # Without users, an operator login with a random password is generated and logged at startup.
-  users:
-    - username: admin
-      password: "{noop}admin"
-      role: OPERATOR
-    - username: viewer
-      password: "{noop}viewer"
-      role: VIEWER
+  # Without users, an operator login "admin" with a random password is generated and logged at startup.
+  #   - username: ops
+  #     password: "{bcrypt}$2a$10$..."
+  #     role: OPERATOR          # or VIEWER
+  users: []
