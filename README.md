@@ -1,4 +1,6 @@
-# Namastack Outbox Visualiser
+<p align="center"><img src="https://raw.githubusercontent.com/asgreflexx/namastack-visualiser/main/docs/logo.svg" width="112" alt=""></p>
+
+<h1 align="center">Namastack Outbox Visualiser</h1>
 
 Web UI for the tables of [Namastack Outbox](https://github.com/namastack/namastack-outbox) (JDBC module, tested against the v1.11 schema).
 It shows what is sitting in the outboxes of one or more services and lets you reprocess events.
@@ -9,6 +11,15 @@ It shows what is sitting in the outboxes of one or more services and lets you re
 - **Blocked keys**: FAILED records and the number of records queued behind them
 - **Cluster**: Namastack instances with their heartbeat and the assignment of the 256 partitions
 - **Audit log**: who performed which action and when
+
+![Dashboard](https://raw.githubusercontent.com/asgreflexx/namastack-visualiser/main/docs/screenshots/dashboard.png)
+
+## Screenshots
+
+| | |
+|---|---|
+| **Records** with detail drawer<br>![Record detail](https://raw.githubusercontent.com/asgreflexx/namastack-visualiser/main/docs/screenshots/record-detail.png) | **Key timeline** of a blocked key<br>![Key timeline](https://raw.githubusercontent.com/asgreflexx/namastack-visualiser/main/docs/screenshots/key-timeline.png) |
+| **Blocked keys**<br>![Blocked keys](https://raw.githubusercontent.com/asgreflexx/namastack-visualiser/main/docs/screenshots/blocked.png) | **Cluster** instances and partitions<br>![Cluster](https://raw.githubusercontent.com/asgreflexx/namastack-visualiser/main/docs/screenshots/cluster.png) |
 
 ## Actions
 
