@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Audit-Log')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('audit')}"></aside>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>Audit-Log</h1>
+        <p>Alle Änderungen an Records seit dem letzten Start. Dauerhaft landen sie im Logger <code>AUDIT</code>.</p>
+      </div>
+    </header>
+    <section class="panel">
+      <div class="empty" th:if="${entries.isEmpty()}">
+        <strong>Noch keine Aktionen</strong>
+        Retries, Replays und Bulk-Retries erscheinen hier.
+      </div>
+      <div class="table-wrap" th:unless="${entries.isEmpty()}">
+        <table class="data">
+          <thead><tr><th>Zeit</th><th>Benutzer</th><th>Quelle</th><th>Aktion</th><th>Ziel</th><th class="num">Betroffen</th></tr></thead>
+          <tbody>
+          <tr th:each="e : ${entries}">
+            <td th:text="${@fmt.time(e.at())}"></td>
+            <td th:text="${e.user()}"></td>
+            <td th:text="${e.sourceId()}"></td>
+            <td th:text="${e.action().label()}"></td>
+            <td class="truncate"><code th:text="${e.target()}" th:title="${e.target()}"></code></td>
+            <td class="num" th:text="${e.affected()}"></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+</body>
+</html>

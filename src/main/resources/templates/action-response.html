@@ -1,0 +1,8 @@
+<th:block xmlns:th="http://www.thymeleaf.org">
+  <th:block th:if="${record != null}">
+    <div th:replace="~{record-detail :: drawer}"></div>
+  </th:block>
+  <div id="toasts" hx-swap-oob="beforeend">
+    <div class="toast" th:classappend="${result.success()} ? '' : 'warn'" th:text="${result.message()}">Erledigt</div>
+  </div>
+</th:block>

@@ -1,0 +1,17 @@
+[versions]
+spring-boot = "4.1.2"
+dependency-management = "1.1.7"
+htmx = "2.0.11"
+chartjs = "4.6.1"
+webjars-locator = "1.1.5"
+testcontainers = "2.0.5"
+
+[libraries]
+webjars-locator-lite = { module = "org.webjars:webjars-locator-lite", version.ref = "webjars-locator" }
+webjars-htmx = { module = "org.webjars.npm:htmx.org", version.ref = "htmx" }
+webjars-chartjs = { module = "org.webjars.npm:chart.js", version.ref = "chartjs" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+dependency-management = { id = "io.spring.dependency-management", version.ref = "dependency-management" }

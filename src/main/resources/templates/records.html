@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Records')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('records')}"></aside>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>Records</h1>
+        <p>Alle Einträge der Outbox, neueste zuerst. Klick auf eine Zeile zeigt Payload, Fehler und Aktionen.</p>
+      </div>
+      <form class="controls" method="get" th:action="@{/records}" th:if="${source != null}">
+        <th:block th:replace="~{layout :: source-select(${source.id()}, false)}"></th:block>
+      </form>
+    </header>
+
+    <th:block th:if="${sources.isEmpty()}"><div th:replace="~{layout :: no-sources}"></div></th:block>
+
+    <th:block th:if="${source != null}">
+      <form id="filter-form" class="filters" th:action="@{/records}" method="get"
+            hx-get="/records" hx-target="#record-table" hx-swap="outerHTML" hx-push-url="true"
+            hx-trigger="change, input changed delay:400ms from:#record-key">
+        <input type="hidden" name="source" th:value="${source.id()}">
+        <label class="field">Status
+          <select name="status">
+            <option value="">Alle</option>
+            <option th:each="st : ${statuses}" th:value="${st}" th:text="${st}" th:selected="${filter.status() == st}"></option>
+          </select>
+        </label>
+        <label class="field">Typ
+          <select name="recordType">
+            <option value="">Alle Typen</option>
+            <option th:each="t : ${recordTypes}" th:value="${t}" th:text="${@fmt.type(t)}"
+                    th:title="${t}" th:selected="${filter.recordType() == t}"></option>
+          </select>
+        </label>
+        <label class="field">Handler
+          <select name="handlerId">
+            <option value="">Alle Handler</option>
+            <option th:each="h : ${handlerIds}" th:value="${h}" th:text="${@fmt.handler(h)}"
+                    th:title="${h}" th:selected="${filter.handlerId() == h}"></option>
+          </select>
+        </label>
+        <label class="field grow">Key beginnt mit
+          <input type="search" id="record-key" name="recordKey" th:value="${filter.recordKey()}" placeholder="z. B. order-1042" autocomplete="off">
+        </label>
+      </form>
+
+      <section class="panel" id="record-table" th:fragment="table">
+        <div class="alert" th:if="${error != null}" th:text="'Quelle nicht lesbar: ' + ${error}"></div>
+        <div class="empty" th:if="${error == null and result.items().isEmpty()}">
+          <strong>Keine Records gefunden</strong>
+          Lockere die Filter oder wähle eine andere Quelle.
+        </div>
+        <div class="table-wrap" th:unless="${result.items().isEmpty()}">
+          <table class="data">
+            <thead>
+            <tr>
+              <th>Status</th><th>Typ</th><th>Key</th><th>Handler</th><th>Erstellt</th>
+              <th class="num">Versuche</th><th>Nächster Versuch / Dauer</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr class="clickable" th:each="r : ${result.items()}"
+                th:attr="hx-get=@{/records/{s}/{id}(s=${r.sourceId()}, id=${r.id()})}" hx-target="#drawer">
+              <td th:with="status=${r.status().name()}"><th:block th:replace="~{layout :: status(${status})}"></th:block></td>
+              <td th:text="${r.shortType()}" th:title="${r.recordType()}">OrderCreatedEvent</td>
+              <td><code th:text="${r.recordKey()}">order-1</code></td>
+              <td class="truncate" th:text="${r.shortHandler()}" th:title="${r.handlerId()}">Handler#handle</td>
+              <td th:text="${@fmt.time(r.createdAt())}" th:title="${@fmt.relative(r.createdAt())}"></td>
+              <td class="num" th:text="${r.failureCount()}">0</td>
+              <td>
+                <span th:if="${r.status().name() == 'COMPLETED'}" class="muted" th:text="${@fmt.duration(r.processingTime())}"></span>
+                <span th:if="${r.status().name() == 'NEW'}" th:text="${@fmt.relative(r.nextRetryAt())}"></span>
+                <span th:if="${r.status().name() == 'FAILED'}" class="faint">blockiert Key</span>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span th:text="|${@fmt.number(result.total())} Records, Seite ${result.page() + 1} von ${result.totalPages()}|"></span>
+          <span class="btns">
+            <button class="btn small" th:disabled="${!result.hasPrevious()}" hx-include="#filter-form"
+                    th:attr="hx-get=@{/records(page=${result.page() - 1})}" hx-target="#record-table" hx-swap="outerHTML" hx-push-url="true">Zurück</button>
+            <button class="btn small" th:disabled="${!result.hasNext()}" hx-include="#filter-form"
+                    th:attr="hx-get=@{/records(page=${result.page() + 1})}" hx-target="#record-table" hx-swap="outerHTML" hx-push-url="true">Weiter</button>
+          </span>
+        </div>
+      </section>
+    </th:block>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+</body>
+</html>

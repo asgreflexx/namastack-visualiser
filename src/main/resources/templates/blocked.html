@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Blockierte Keys')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('blocked')}"></aside>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>Blockierte Keys</h1>
+        <p>Ein FAILED-Record hält alle späteren Records mit demselben Key zurück. Ein Retry setzt ihn auf NEW, danach laufen die wartenden Records weiter.</p>
+      </div>
+      <form class="controls" method="get" th:action="@{/blocked}">
+        <th:block th:replace="~{layout :: source-select(${selectedSource}, true)}"></th:block>
+      </form>
+    </header>
+
+    <th:block th:if="${sources.isEmpty()}"><div th:replace="~{layout :: no-sources}"></div></th:block>
+
+    <section class="source-section" th:each="b : ${blocked}" th:with="writable=${canOperate and !b.source().readOnly()}">
+      <header>
+        <h2 th:text="${b.source().name()}">Service</h2>
+        <span class="muted small" th:if="${b.error() == null}"
+              th:text="${b.keys().isEmpty()} ? 'Nichts blockiert' : ${b.keys().size()} + ' FAILED-Records'"></span>
+      </header>
+
+      <div class="alert" th:if="${b.error() != null}" th:text="'Quelle nicht lesbar: ' + ${b.error()}"></div>
+
+      <th:block th:if="${b.error() == null and !b.keys().isEmpty()}">
+        <div class="panel">
+          <h3>Nach Handler und Typ</h3>
+          <div class="table-wrap">
+            <table class="data">
+              <thead><tr><th>Handler</th><th>Typ</th><th class="num">FAILED</th><th th:if="${writable}"></th></tr></thead>
+              <tbody>
+              <tr th:each="g : ${b.groups()}">
+                <td th:text="${g.shortHandler()}" th:title="${g.handlerId()}"></td>
+                <td th:text="${g.shortType()}" th:title="${g.recordType()}"></td>
+                <td class="num" th:text="${g.count()}"></td>
+                <td th:if="${writable}" style="text-align: right">
+                  <button class="btn small"
+                          th:attr="hx-post=@{/actions/{s}/bulk-retry(s=${b.source().id()}, handlerId=${g.handlerId()}, recordType=${g.recordType()})},
+                                   hx-confirm=|${g.count()} FAILED-Records von ${g.shortHandler()} erneut versuchen?|"
+                          hx-target="closest tr" hx-swap="outerHTML">Alle erneut versuchen</button>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Einzelne Records</h3>
+          <div class="table-wrap">
+            <table class="data">
+              <thead>
+              <tr><th>Key</th><th>Typ</th><th>Fehler</th><th class="num">Versuche</th><th>Seit</th><th>Wartende Records</th><th th:if="${writable}"></th></tr>
+              </thead>
+              <tbody>
+              <tr th:each="k : ${b.keys()}" th:with="max=${b.maxWaiting() == 0 ? 1 : b.maxWaiting()}">
+                <td><a th:href="@{/keys(source=${b.source().id()}, key=${k.recordKey()})}"><code th:text="${k.recordKey()}"></code></a></td>
+                <td>
+                  <a href="#" th:attr="hx-get=@{/records/{s}/{id}(s=${b.source().id()}, id=${k.recordId()})}" hx-target="#drawer"
+                     th:text="${k.shortType()}" th:title="${k.handlerId()}"></a>
+                </td>
+                <td class="truncate" th:text="${k.failureReason()}" th:title="${k.failureReason()}"></td>
+                <td class="num" th:text="${k.failureCount()}"></td>
+                <td th:text="${@fmt.relative(k.createdAt())}" th:title="${@fmt.time(k.createdAt())}"></td>
+                <td>
+                  <div class="waitbar">
+                    <b th:text="${k.waitingRecords()}">0</b>
+                    <span th:style="|width: ${100 * k.waitingRecords() / max}px|"></span>
+                  </div>
+                </td>
+                <td th:if="${writable}" style="text-align: right">
+                  <button class="btn small primary"
+                          th:attr="hx-post=@{/actions/{s}/records/{id}/retry(s=${b.source().id()}, id=${k.recordId()}, view='none')}"
+                          hx-target="closest tr" hx-swap="outerHTML">Erneut versuchen</button>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small faint" th:if="${b.keys().size() >= limit}" th:text="|Es werden die ältesten ${limit} FAILED-Records angezeigt.|"></p>
+        </div>
+      </th:block>
+    </section>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+</body>
+</html>

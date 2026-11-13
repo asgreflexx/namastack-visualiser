@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Fehler')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('')}"></aside>
+  <main>
+    <div class="panel empty">
+      <strong>Das ging nicht</strong>
+      <span th:text="${message}">Unbekannter Fehler</span>
+      <p><a th:href="@{/}">Zum Dashboard</a></p>
+    </div>
+  </main>
+</div>
+</body>
+</html>

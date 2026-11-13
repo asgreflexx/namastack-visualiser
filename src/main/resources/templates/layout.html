@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${title} + ' · Outbox Visualiser'">Outbox Visualiser</title>
+  <meta th:if="${_csrf != null}" name="_csrf" th:content="${_csrf.token}">
+  <meta th:if="${_csrf != null}" name="_csrf_header" th:content="${_csrf.headerName}">
+  <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script th:src="@{/webjars/htmx.org/dist/htmx.min.js}" defer></script>
+  <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body>
+
+<aside class="sidebar" th:fragment="sidebar(active)">
+  <a class="brand" th:href="@{/}">
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M7 11h18v13H7z" fill="none" stroke="var(--surface)" stroke-width="2.2" stroke-linejoin="round"/><path d="M7 11l9 7 9-7" fill="none" stroke="var(--surface)" stroke-width="2.2" stroke-linejoin="round"/><circle cx="24.5" cy="9" r="4.5" fill="var(--new)" stroke="currentColor" stroke-width="2"/></svg>
+    <div><strong>Outbox Visualiser</strong><span>für Namastack Outbox</span></div>
+  </a>
+  <nav class="nav">
+    <a th:href="@{/}" th:attr="aria-current=${active == 'dashboard'} ? 'page' : null">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg><span>Dashboard</span></a>
+    <a th:href="@{/records}" th:attr="aria-current=${active == 'records'} ? 'page' : null">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Records</span></a>
+    <a th:href="@{/keys}" th:attr="aria-current=${active == 'keys'} ? 'page' : null">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3M14 12h3"/></svg><span>Key-Timeline</span></a>
+    <a th:href="@{/blocked}" th:attr="aria-current=${active == 'blocked'} ? 'page' : null">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg><span>Blockierte Keys</span></a>
+    <a th:href="@{/cluster}" th:attr="aria-current=${active == 'cluster'} ? 'page' : null">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Cluster</span></a>
+    <a th:href="@{/audit}" th:attr="aria-current=${active == 'audit'} ? 'page' : null">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg><span>Audit-Log</span></a>
+  </nav>
+  <div class="sidebar-foot" th:if="${username != null}">
+    <div><span th:text="${username}">admin</span> <span class="faint" th:text="${canOperate} ? '(Operator)' : '(nur lesen)'"></span></div>
+    <form th:action="@{/logout}" method="post"><button class="btn small" type="submit">Abmelden</button></form>
+  </div>
+</aside>
+
+<th:block th:fragment="overlays">
+  <div id="drawer" aria-live="polite"></div>
+  <div id="toasts" aria-live="polite"></div>
+</th:block>
+
+<th:block th:fragment="status(status)">
+  <span class="status" th:classappend="${#strings.toLowerCase(status)}" th:text="${status}">NEW</span>
+</th:block>
+
+<th:block th:fragment="source-select(selected, allowAll)">
+  <label class="field">Quelle
+    <select name="source" onchange="this.form.submit()">
+      <option th:if="${allowAll}" value="" th:selected="${selected == null or selected == ''}">Alle Quellen</option>
+      <option th:each="s : ${sources}" th:value="${s.id()}" th:text="${s.name()}" th:selected="${s.id() == selected}"></option>
+    </select>
+  </label>
+</th:block>
+
+<div th:fragment="no-sources" class="panel empty">
+  <strong>Noch keine Outbox-Quelle eingerichtet</strong>
+  Trag deine Service-Datenbanken unter <code>visualiser.sources</code> in der <code>application.yml</code> ein,
+  oder starte mit dem Profil <code>demo</code>, um mit Beispieldaten zu testen.
+</div>
+
+</body>
+</html>

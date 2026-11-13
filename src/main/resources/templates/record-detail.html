@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Record')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('records')}"></aside>
+  <main>
+    <div id="drawer-standalone" class="panel">
+      <div class="drawer-panel" th:fragment="drawer" th:with="st=${record.status().name()}">
+        <div class="drawer-head">
+          <div>
+            <th:block th:replace="~{layout :: status(${st})}"></th:block>
+            <h2 th:text="${record.shortType()}" th:title="${record.recordType()}">OrderCreatedEvent</h2>
+            <div class="small muted" th:text="${source.name()}">Service</div>
+          </div>
+          <button class="close" type="button" data-close-drawer aria-label="Schließen">&times;</button>
+        </div>
+
+        <div class="lifecycle" aria-label="Lebenszyklus">
+          <div class="step"><span class="dot on-new"></span>Erstellt<br><span class="faint" th:text="${@fmt.time(record.createdAt())}"></span></div>
+          <span class="line"></span>
+          <div class="step">
+            <span class="dot" th:classappend="${record.failureCount() > 0} ? 'on-retry'"></span>
+            <span th:text="${record.failureCount() == 1} ? '1 Fehlversuch' : ${record.failureCount()} + ' Fehlversuche'">0 Fehlversuche</span>
+          </div>
+          <span class="line"></span>
+          <div class="step" th:switch="${st}">
+            <th:block th:case="'COMPLETED'"><span class="dot on-done"></span>Abgeschlossen<br><span class="faint" th:text="${@fmt.duration(record.processingTime())}"></span></th:block>
+            <th:block th:case="'FAILED'"><span class="dot on-failed"></span>Aufgegeben<br><span class="faint">blockiert Key</span></th:block>
+            <th:block th:case="*"><span class="dot"></span>Ausstehend<br><span class="faint" th:text="${@fmt.isPast(record.nextRetryAt())} ? 'fällig' : 'nächster Versuch ' + ${@fmt.relative(record.nextRetryAt())}"></span></th:block>
+          </div>
+        </div>
+
+        <div class="actions" th:if="${canOperate and !source.readOnly()}">
+          <button class="btn primary" th:if="${record.canRetry()}"
+                  th:attr="hx-post=@{/actions/{s}/records/{id}/retry(s=${source.id()}, id=${record.id()})}"
+                  hx-target="#drawer">Erneut versuchen</button>
+          <button class="btn" th:if="${record.canRunNow()}"
+                  th:attr="hx-post=@{/actions/{s}/records/{id}/run-now(s=${source.id()}, id=${record.id()})}"
+                  hx-target="#drawer">Jetzt ausführen</button>
+          <button class="btn" th:if="${record.canReplay()}"
+                  th:attr="hx-post=@{/actions/{s}/records/{id}/replay(s=${source.id()}, id=${record.id()})}"
+                  hx-confirm="Eine Kopie dieses Events wird angelegt und vom Handler erneut verarbeitet. Fortfahren?"
+                  hx-target="#drawer">Erneut senden (Replay)</button>
+          <span class="hint" th:if="${record.canRetry()}">Setzt den Record auf NEW zurück und gibt damit die wartenden Records dieses Keys frei.</span>
+          <span class="hint" th:if="${record.canRunNow()}">Überspringt die restliche Wartezeit bis zum nächsten Versuch.</span>
+          <span class="hint" th:if="${record.canReplay()}">Legt eine Kopie mit neuer ID an, die hinter allen bisherigen Records dieses Keys eingereiht wird.</span>
+        </div>
+        <p class="small faint" th:if="${source.readOnly()}">Diese Quelle ist schreibgeschützt konfiguriert.</p>
+
+        <h3 th:if="${record.failureReason() != null}">Letzter Fehler</h3>
+        <pre class="code failure" th:if="${record.failureReason() != null}" th:text="${record.failureReason()}"></pre>
+
+        <dl class="facts">
+          <dt>ID</dt><dd><code th:text="${record.id()}"></code></dd>
+          <dt>Key</dt><dd><a th:href="@{/keys(source=${source.id()}, key=${record.recordKey()})}"><code th:text="${record.recordKey()}"></code></a></dd>
+          <dt>Typ</dt><dd><code th:text="${record.recordType()}"></code></dd>
+          <dt>Handler</dt><dd><code th:text="${record.handlerId()}"></code></dd>
+          <dt>Partition</dt><dd th:text="${record.partitionNo()}"></dd>
+          <dt>Erstellt</dt><dd th:text="${@fmt.precise(record.createdAt())}"></dd>
+          <dt>Abgeschlossen</dt><dd th:text="${@fmt.precise(record.completedAt())}"></dd>
+          <dt>Nächster Versuch</dt><dd th:text="${st == 'NEW'} ? ${@fmt.precise(record.nextRetryAt())} + ' (' + ${@fmt.relative(record.nextRetryAt())} + ')' : '–'"></dd>
+        </dl>
+
+        <h3>Payload</h3>
+        <pre class="code" data-json th:text="${record.payload()}"></pre>
+
+        <th:block th:if="${record.context() != null and !record.context().isBlank()}">
+          <h3>Context</h3>
+          <pre class="code" data-json th:text="${record.context()}"></pre>
+        </th:block>
+      </div>
+    </div>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+</body>
+</html>

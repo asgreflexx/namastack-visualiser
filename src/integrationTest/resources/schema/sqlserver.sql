@@ -1,0 +1,82 @@
+IF NOT EXISTS(SELECT *
+              FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_NAME = 'outbox_record')
+CREATE TABLE outbox_record
+(
+    id             VARCHAR(255)  NOT NULL,
+    status         VARCHAR(20)   NOT NULL,
+    record_key     VARCHAR(255)  NOT NULL,
+    record_type    VARCHAR(255)  NOT NULL,
+    payload        NVARCHAR(MAX) NOT NULL,
+    context        NVARCHAR(MAX) NULL,
+    created_at     DATETIME2(6)  NOT NULL,
+    completed_at   DATETIME2(6)  NULL,
+    failure_count  INT           NOT NULL,
+    failure_reason VARCHAR(1000) NULL,
+    next_retry_at  DATETIME2(6)  NOT NULL,
+    partition_no   INT           NOT NULL,
+    handler_id     VARCHAR(1000) NOT NULL
+        PRIMARY KEY (id)
+);
+
+IF NOT EXISTS(SELECT *
+              FROM sys.indexes
+              WHERE name = 'idx_outbox_record_status_created_id'
+                AND object_id = OBJECT_ID('outbox_record'))
+CREATE INDEX idx_outbox_record_status_created_id
+    ON outbox_record (status, created_at, id)
+    INCLUDE (partition_no, next_retry_at, record_key);
+
+IF NOT EXISTS(SELECT *
+              FROM sys.indexes
+              WHERE name = 'idx_outbox_record_key_completed_created_id'
+                AND object_id = OBJECT_ID('outbox_record'))
+CREATE INDEX idx_outbox_record_key_completed_created_id
+    ON outbox_record (record_key, completed_at, created_at, id);
+
+IF NOT EXISTS(SELECT *
+              FROM sys.indexes
+              WHERE name = 'idx_outbox_record_status_retry_partition'
+                AND object_id = OBJECT_ID('outbox_record'))
+CREATE INDEX idx_outbox_record_status_retry_partition
+    ON outbox_record (status, next_retry_at)
+    INCLUDE (partition_no);
+
+IF NOT EXISTS(SELECT *
+              FROM sys.indexes
+              WHERE name = 'idx_outbox_record_status_partition'
+                AND object_id = OBJECT_ID('outbox_record'))
+CREATE INDEX idx_outbox_record_status_partition
+    ON outbox_record (status, partition_no);
+
+IF NOT EXISTS(SELECT *
+              FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_NAME = 'outbox_instance')
+CREATE TABLE outbox_instance
+(
+    instance_id    VARCHAR(255) NOT NULL,
+    hostname       VARCHAR(255) NOT NULL,
+    port           INT          NOT NULL,
+    status         VARCHAR(50)  NOT NULL,
+    started_at     DATETIME2(6) NOT NULL,
+    last_heartbeat DATETIME2(6) NOT NULL,
+    created_at     DATETIME2(6) NOT NULL,
+    updated_at     DATETIME2(6) NOT NULL
+        PRIMARY KEY (instance_id),
+    INDEX idx_outbox_instance_status_heartbeat (status, last_heartbeat),
+    INDEX idx_outbox_instance_last_heartbeat (last_heartbeat),
+    INDEX idx_outbox_instance_status (status)
+);
+
+IF NOT EXISTS(SELECT *
+              FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_NAME = 'outbox_partition')
+CREATE TABLE outbox_partition
+(
+    partition_number INT          NOT NULL,
+    instance_id      VARCHAR(255),
+    version          BIGINT       NOT NULL DEFAULT 0,
+    updated_at       DATETIME2(6) NOT NULL
+        PRIMARY KEY (partition_number),
+    INDEX idx_outbox_partition_instance_id (instance_id)
+);

@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: namastack-visualiser
+  threads:
+    virtual:
+      enabled: true
+  thymeleaf:
+    cache: true
+
+server:
+  port: 8090
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+
+visualiser:
+  # How long an ACTIVE instance may be silent before it is shown as stale.
+  instance-stale-after: 30s
+  # One entry per service database containing Namastack outbox tables.
+  sources:
+    - id: testid
+      name: testname
+      url: "" # jdbc:
+      username: testuser
+      password: ""
+      schema: ""          # like namastack.outbox.jdbc.schema-name
+      table-prefix: ""       # like namastack.outbox.jdbc.table-prefix
+      read-only: true       # true disables retry/replay for this source
+  # Users that may log in. Passwords use Spring Security's {id} format, e.g. {bcrypt}$2a$10$...
+  # Without users, an operator login with a random password is generated and logged at startup.
+  users:
+    - username: admin
+      password: "{noop}admin"
+      role: OPERATOR
+    - username: viewer
+      password: "{noop}viewer"
+      role: VIEWER

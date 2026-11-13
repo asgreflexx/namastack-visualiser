@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Key-Timeline')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('keys')}"></aside>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>Key-Timeline</h1>
+        <p>Namastack verarbeitet die Records eines Keys strikt der Reihe nach. Hier siehst du, welcher Record gerade dran ist und wer dahinter wartet.</p>
+      </div>
+    </header>
+
+    <th:block th:if="${sources.isEmpty()}"><div th:replace="~{layout :: no-sources}"></div></th:block>
+
+    <th:block th:if="${source != null}">
+      <form class="filters" method="get" th:action="@{/keys}">
+        <label class="field">Quelle
+          <select name="source">
+            <option th:each="s : ${sources}" th:value="${s.id()}" th:text="${s.name()}" th:selected="${s.id() == source.id()}"></option>
+          </select>
+        </label>
+        <label class="field grow">Record-Key
+          <input type="search" name="key" th:value="${key}" placeholder="z. B. order-1042" required autofocus>
+        </label>
+        <button class="btn primary" type="submit">Anzeigen</button>
+      </form>
+
+      <div class="alert" th:if="${error != null}" th:text="'Quelle nicht lesbar: ' + ${error}"></div>
+
+      <div class="panel empty" th:if="${timeline == null and error == null}">
+        <strong>Gib einen Record-Key ein</strong>
+        Du findest Keys in der Record-Liste oder bei den blockierten Keys.
+      </div>
+
+      <th:block th:if="${timeline != null}">
+        <div class="panel empty" th:if="${timeline.entries().isEmpty()}">
+          <strong th:text="|Keine Records für „${key}“|"></strong>
+          Abgeschlossene Records werden von Namastack nach einer Weile gelöscht, wenn das Aufräumen aktiv ist.
+        </div>
+
+        <th:block th:unless="${timeline.entries().isEmpty()}">
+          <div class="chain-note" th:if="${timeline.waiting() > 0}">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
+            <span th:text="${timeline.waiting() == 1} ? '1 Record wartet auf einen Vorgänger, der noch nicht abgeschlossen ist.' : ${timeline.waiting()} + ' Records warten auf einen Vorgänger, der noch nicht abgeschlossen ist.'"></span>
+          </div>
+
+          <section class="panel">
+            <div class="chart-head" style="margin-bottom: 12px">
+              <h2 th:text="|${timeline.entries().size()} Records für ${timeline.recordKey()}|">Records</h2>
+              <div class="legend">
+                <span><i style="background: var(--done)"></i>abgeschlossen</span>
+                <span><i style="background: var(--failed)"></i>fehlgeschlagen</span>
+                <span><i style="background: var(--new)"></i>bereit</span>
+                <span><i style="background: var(--backoff)"></i>Backoff</span>
+                <span><i style="border: 2px dashed var(--waiting)"></i>wartet</span>
+              </div>
+            </div>
+            <div class="axis">
+              <span>Record</span>
+              <div class="ticks">
+                <span th:text="${@fmt.time(timeline.start())}"></span>
+                <span>jetzt</span>
+              </div>
+            </div>
+            <div class="lanes">
+              <div class="lane" th:each="e, iter : ${timeline.entries()}"
+                   th:attr="hx-get=@{/records/{s}/{id}(s=${source.id()}, id=${e.record().id()})}" hx-target="#drawer">
+                <div class="meta">
+                  <span class="seq" th:text="${iter.count}">1</span>
+                  <span class="type" th:text="${e.record().shortType()}" th:title="${e.record().recordType()}"></span>
+                  <span class="sub">
+                    <span class="status" th:classappend="${e.state().css()}" th:text="${e.state().label()}"></span>
+                    <span th:text="${@fmt.time(e.record().createdAt())}"></span>
+                  </span>
+                </div>
+                <div class="track" th:title="|${e.record().shortHandler()}: ${e.state().label()}|">
+                  <span class="bar" th:classappend="${e.state().css()}"
+                        th:style="|left: ${e.leftPercent()}%; width: ${e.widthPercent()}%|"></span>
+                </div>
+              </div>
+            </div>
+            <p class="small faint" th:if="${timeline.entries().size() >= maxRecords}" th:text="|Es werden die ersten ${maxRecords} Records angezeigt.|"></p>
+          </section>
+        </th:block>
+      </th:block>
+    </th:block>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+</body>
+</html>

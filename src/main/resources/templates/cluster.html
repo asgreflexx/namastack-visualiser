@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Cluster')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('cluster')}"></aside>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>Cluster</h1>
+        <p>Welche Instanz welche der 256 Partitionen verarbeitet. Die Zahl in einer Zelle sind die offenen Records dieser Partition.</p>
+      </div>
+      <form class="controls" method="get" th:action="@{/cluster}" th:if="${source != null}">
+        <th:block th:replace="~{layout :: source-select(${source.id()}, false)}"></th:block>
+        <label class="toggle"><input type="checkbox" id="auto-refresh" checked> Live alle 5 s</label>
+      </form>
+    </header>
+
+    <th:block th:if="${sources.isEmpty()}"><div th:replace="~{layout :: no-sources}"></div></th:block>
+
+    <div id="cluster-content" th:fragment="content" th:if="${source != null}"
+         th:attr="hx-get=@{/cluster(source=${source.id()})}" hx-trigger="every 5s [autoRefresh()]" hx-swap="outerHTML">
+      <div class="alert" th:if="${error != null}" th:text="'Quelle nicht lesbar: ' + ${error}"></div>
+
+      <div class="cluster" th:if="${overview != null}">
+        <section>
+          <h2 th:text="${overview.instances().size() == 1} ? '1 Instanz' : ${overview.instances().size()} + ' Instanzen'"></h2>
+          <div class="panel empty" th:if="${overview.instances().isEmpty()}">
+            <strong>Keine Instanz registriert</strong>
+            Sobald ein Service mit Namastack Outbox startet, erscheint er hier.
+          </div>
+          <div class="instances">
+            <div class="instance" th:each="i : ${overview.instances()}" th:classappend="|slot-${i.colourSlot() % 8}|">
+              <span class="health" th:classappend="${#strings.toLowerCase(i.health())}" th:title="${i.health()}"></span>
+              <span class="id" th:text="${i.instance().instanceId()}">instance</span>
+              <span class="owned"><span th:text="${i.ownedPartitions()}">0</span><small>Partitionen</small></span>
+              <span class="detail"
+                    th:text="|${i.instance().hostname()}:${i.instance().port()}, ${i.instance().status()}, Heartbeat vor ${@fmt.duration(i.heartbeatAge())}, gestartet ${@fmt.time(i.instance().startedAt())}|"></span>
+            </div>
+          </div>
+          <p class="alert" style="margin-top: 14px" th:if="${overview.unassignedPartitions() > 0}"
+             th:text="|${overview.unassignedPartitions()} Partitionen sind keiner Instanz zugewiesen. Deren Records werden gerade nicht verarbeitet.|"></p>
+        </section>
+
+        <section class="grid-wrap">
+          <div class="partition-grid" role="img" aria-label="Partitionen nach Instanz">
+            <span class="cell" th:each="c : ${overview.partitions()}"
+                  th:classappend="${c.colourSlot() == null} ? 'unassigned' : (${c.colourSlot() < 0} ? 'slot-orphan' : |slot-${c.colourSlot() % 8}|) + (${c.openRecords() >= 5} ? ' hot' : '')"
+                  th:title="|Partition ${c.number()}: ${c.instanceId() ?: 'nicht zugewiesen'}, ${c.openRecords()} offen|"
+                  th:text="${c.openRecords() > 0} ? ${c.openRecords()} : ''"></span>
+          </div>
+          <div class="grid-legend">
+            <span th:each="i : ${overview.instances()}" th:classappend="|slot-${i.colourSlot() % 8}|"><i></i><span th:text="${i.instance().instanceId()}"></span></span>
+            <span class="slot-0"><i style="background: none; outline: 1px dashed var(--failed)"></i>nicht zugewiesen</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+</body>
+</html>

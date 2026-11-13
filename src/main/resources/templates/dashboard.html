@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Dashboard')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{layout :: sidebar('dashboard')}"></aside>
+  <main>
+    <header class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <p>Was gerade in den Outboxen liegt, wie schnell es abgearbeitet wird und wo es hakt.</p>
+      </div>
+      <form class="controls" method="get" th:action="@{/}">
+        <input type="hidden" name="window" th:value="${window}">
+        <th:block th:replace="~{layout :: source-select(${selectedSource}, true)}"></th:block>
+        <label class="toggle"><input type="checkbox" id="auto-refresh" checked> Live alle 5 s</label>
+      </form>
+    </header>
+
+    <th:block th:if="${sources.isEmpty()}"><div th:replace="~{layout :: no-sources}"></div></th:block>
+
+    <th:block th:unless="${sources.isEmpty()}">
+      <section id="summary" th:fragment="summary"
+               th:attr="hx-get=@{/fragments/summary(source=${selectedSource})}"
+               hx-trigger="every 5s [autoRefresh()]" hx-swap="outerHTML">
+        <div class="totals">
+          <div class="total is-new" th:classappend="${totals.newCount() == 0} ? 'is-quiet'">
+            <div class="value" th:text="${@fmt.number(totals.newCount())}">0</div>
+            <div class="label">offen (NEW)</div>
+          </div>
+          <div class="total is-failed" th:classappend="${totals.failedCount() == 0} ? 'is-quiet'">
+            <div class="value" th:text="${@fmt.number(totals.failedCount())}">0</div>
+            <div class="label">fehlgeschlagen (FAILED)</div>
+          </div>
+          <div class="total is-blocked" th:classappend="${totals.blockedKeys() == 0} ? 'is-quiet'">
+            <div class="value" th:text="${@fmt.number(totals.blockedKeys())}">0</div>
+            <div class="label">blockierte Keys</div>
+          </div>
+          <div class="total">
+            <div class="value" th:text="${@fmt.duration(totals.maxLag())}">–</div>
+            <div class="label">ältester offener Record</div>
+          </div>
+          <div class="total">
+            <div class="value" th:text="${@fmt.number(totals.completedCount())}">0</div>
+            <div class="label">abgeschlossen (noch gespeichert)</div>
+          </div>
+        </div>
+
+        <div class="source-rows">
+          <div class="source-row" th:each="s : ${summaries}" th:classappend="${!s.available()} ? 'down'">
+            <div class="name">
+              <strong><a th:href="@{/(source=${s.sourceId()})}" th:text="${s.name()}">Service</a></strong>
+              <span th:text="${s.sourceId()} + (${s.readOnly()} ? ', schreibgeschützt' : '')">id</span>
+            </div>
+            <th:block th:if="${s.available()}"
+                      th:with="sum=${s.newCount() + s.failedCount() + s.completedCount()}, base=${sum == 0 ? 1 : sum}">
+              <div class="stack" th:title="|${s.newCount()} NEW, ${s.failedCount()} FAILED, ${s.completedCount()} COMPLETED|">
+                <span class="s-failed" th:style="|width: ${100.0 * s.failedCount() / base}%|"></span>
+                <span class="s-new" th:style="|width: ${100.0 * s.newCount() / base}%|"></span>
+                <span class="s-done" th:style="|width: ${100.0 * s.completedCount() / base}%|"></span>
+              </div>
+              <div class="metric"><span th:text="${@fmt.number(s.newCount())}">0</span><small>NEW</small></div>
+              <div class="metric"><a th:href="@{/blocked(source=${s.sourceId()})}" th:text="${@fmt.number(s.failedCount())}">0</a><small>FAILED</small></div>
+              <div class="metric"><span th:text="${@fmt.number(s.blockedKeys())}">0</span><small>blockierte Keys</small></div>
+              <div class="metric"><span th:text="${@fmt.duration(s.lag())}">–</span><small>ältester offener</small></div>
+            </th:block>
+            <div class="error" th:unless="${s.available()}" th:text="'Nicht erreichbar: ' + ${s.error()}">Fehler</div>
+          </div>
+        </div>
+      </section>
+
+      <div class="charts" id="dashboard-charts" th:attr="data-source=${selectedSource}, data-window=${window}">
+        <section class="panel">
+          <div class="chart-head">
+            <h2>Durchsatz</h2>
+            <nav class="segmented" aria-label="Zeitfenster">
+              <a th:each="w : ${windows}" th:href="@{/(source=${selectedSource}, window=${w})}"
+                 th:attr="aria-current=${w == window} ? 'true' : null"
+                 th:text="${w.name() == 'M15' ? '15 min' : w.name() == 'H1' ? '1 h' : w.name() == 'H6' ? '6 h' : '24 h'}">1 h</a>
+            </nav>
+          </div>
+          <div class="legend" style="margin-bottom: 10px">
+            <span><i style="background: var(--new)"></i>Erstellt</span>
+            <span><i style="background: var(--done)"></i>Abgeschlossen</span>
+          </div>
+          <div class="chart-box"><canvas id="throughput-chart" aria-label="Erstellte und abgeschlossene Records pro Zeitintervall"></canvas></div>
+        </section>
+        <section class="panel">
+          <div class="chart-head"><h2>Fehler nach Handler</h2><a class="small" th:href="@{/blocked(source=${selectedSource})}">Alle ansehen</a></div>
+          <p id="failures-empty" class="muted small" hidden>Keine FAILED-Records.</p>
+          <div class="chart-box"><canvas id="failures-chart" aria-label="FAILED-Records je Handler"></canvas></div>
+        </section>
+      </div>
+    </th:block>
+  </main>
+</div>
+<th:block th:replace="~{layout :: overlays}"></th:block>
+<script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
+</body>
+</html>

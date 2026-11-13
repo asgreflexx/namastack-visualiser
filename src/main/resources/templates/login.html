@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="de" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Anmelden')}"></head>
+<body>
+<div class="login">
+  <form method="post" th:action="@{/login}">
+    <div>
+      <h1>Outbox Visualiser</h1>
+      <p class="muted small" style="margin: 0">Melde dich an, um die Outboxen deiner Services zu sehen.</p>
+    </div>
+    <div class="alert" th:if="${param.error}">Benutzername oder Passwort stimmt nicht.</div>
+    <div class="alert info" th:if="${param.logout}">Du bist abgemeldet.</div>
+    <label class="field">Benutzername <input type="text" name="username" autocomplete="username" required autofocus></label>
+    <label class="field">Passwort <input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit">Anmelden</button>
+  </form>
+</div>
+</body>
+</html>
